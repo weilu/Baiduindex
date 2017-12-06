@@ -11,6 +11,10 @@
 import time
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException
 from PIL import Image
 import pytesseract
 
@@ -108,39 +112,12 @@ def openbrowser():
             print("请输入“y”或者“n”！")
             select = input("请观察浏览器网站是否已经登陆(y/n)：")
 
-
-def getindex(keyword, day):
-    openbrowser()
-    time.sleep(2)
-
-    # 这里开始进入百度指数
-    # 要不这里就不要关闭了，新打开一个窗口
-    # http://blog.csdn.net/DongGeGe214/article/details/52169761
-    # 新开一个窗口，通过执行js来新开一个窗口
-    js = 'window.open("http://index.baidu.com");'
-    browser.execute_script(js)
-    # 新窗口句柄切换，进入百度指数
-    # 获得当前打开所有窗口的句柄handles
-    # handles为一个数组
-    handles = browser.window_handles
-    # print(handles)
-    # 切换到当前最新打开的窗口
-    browser.switch_to_window(handles[-1])
-    # 在新窗口里面输入网址百度指数
-    # 清空输入框
-    time.sleep(5)
-    browser.find_element_by_id("schword").clear()
-    # 写入需要搜索的百度指数
-    browser.find_element_by_id("schword").send_keys(keyword)
-    # 点击搜索
-    # <input type="submit" value="" id="searchWords" onclick="searchDemoWords()">
-    browser.find_element_by_id("searchWords").click()
-    time.sleep(5)
-    # 最大化窗口
-    browser.maximize_window()
-    time.sleep(2)
+def parse_daily_score(keyword, day):
     # 构造天数
     sel = '//a[@rel="' + str(day) + '"]'
+    wait = WebDriverWait(browser, 10)
+    element = wait.until(EC.element_to_be_clickable((By.XPATH, sel)))
+    time.sleep(1.1)
     browser.find_element_by_xpath(sel).click()
     # 太快了
     time.sleep(2)
@@ -239,7 +216,8 @@ def getindex(keyword, day):
             # 图像识别
             try:
                 image = Image.open(str(path) + "zoom.jpg")
-                code = pytesseract.image_to_string(image) or ''
+                code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789,") or ''
+                code = code.replace(',', '')
             except:
                 code = ''
             index[date] = code
@@ -250,18 +228,109 @@ def getindex(keyword, day):
         print(num)
 
     print(index)
+    return index
+
+
+def visit_baidu_trends(keyword):
+    # 这里开始进入百度指数
+    # 要不这里就不要关闭了，新打开一个窗口
+    # http://blog.csdn.net/DongGeGe214/article/details/52169761
+    # 新开一个窗口，通过执行js来新开一个窗口
+    js = 'window.open("http://index.baidu.com");'
+    browser.execute_script(js)
+    # 新窗口句柄切换，进入百度指数
+    # 获得当前打开所有窗口的句柄handles
+    # handles为一个数组
+    handles = browser.window_handles
+    # print(handles)
+    # 切换到当前最新打开的窗口
+    browser.switch_to_window(handles[-1])
+    # 在新窗口里面输入网址百度指数
+    # 清空输入框
+    time.sleep(5)
+    browser.find_element_by_id("schword").clear()
+    # 写入需要搜索的百度指数
+    browser.find_element_by_id("schword").send_keys(keyword)
+    # 点击搜索
+    # <input type="submit" value="" id="searchWords" onclick="searchDemoWords()">
+    browser.find_element_by_id("searchWords").click()
+    time.sleep(5)
+    # 最大化窗口
+    browser.maximize_window()
+    time.sleep(1)
+
+
+
+def getindex(keyword, day):
+    visit_baidu_trends(keyword)
+
     file = open("../baidu/index.csv", "w")
-    file.write('date,score\n')
-    for date, score in index.items():
-        file.write(f'{date},{score}\n')
+    file.write('city,date,score\n')
+
+    cities = ['梧州', '西安', '上海']
+    for city in cities:
+        find_city(city)
+        index = parse_daily_score(keyword, day)
+        for date, score in index.items():
+            file.write(f'{city},{date},{score}\n')
+        restore_city_selector()
+        time.sleep(1.12)
+
     file.close()
+
+
+def find_city_link(parent_element, text):
+    city_xpath = f".//dd/a[contains(text(), '{text}')]"
+    try:
+        city_link = parent_element.find_element_by_xpath(city_xpath)
+        return city_link
+    except NoSuchElementException:
+        return None
+
+
+def restore_city_selector():
+    browser.find_element_by_css_selector('#compOtharea > div > div.comBorderL').click()
+    province_selector = browser.find_element_by_xpath('//*[@id="auto_gsid_16"]')
+    find_city_link(province_selector, '所有省份').click()
+
+
+def find_city(city, province=None):
+    browser.find_element_by_css_selector('#compOtharea > div > div.comBorderL').click()
+    province_selector = browser.find_element_by_xpath('//*[@id="auto_gsid_16"]')
+    # search top level for 直辖市 first
+    city_link = find_city_link(province_selector, city)
+    if city_link:
+        print('直辖市: ', city_link.text)
+        city_link.click()
+        time.sleep(0.4)
+        city_selector = browser.find_element_by_xpath('//*[@id="auto_gsid_17"]')
+        city_link = find_city_link(city_selector, city)
+        print('city: ', city_link.text)
+        city_link.click()
+    else: # if not found, try every province
+        provinces = province_selector.find_elements_by_xpath('.//dd/a')
+        for province in provinces:
+            if province.text.strip() == '所有省份':
+                continue
+            province.click()
+            city_selector = browser.find_element_by_xpath('//*[@id="auto_gsid_17"]')
+            city_link = find_city_link(city_selector, city)
+            if city_link:
+                print('found city', city_link.text)
+                city_link.click()
+                break
+            else:
+                # bring back the province menu
+                browser.find_element_by_css_selector('#compOtharea > div > div.comBorderL').click()
 
 
 if __name__ == "__main__":
     # 每个字大约占横坐标12.5这样
     # 按照字节可自行更改切割横坐标的大小rangle
-    keyword = input("请输入查询关键字：")
-    sel = int(input("查询7天请按0，30天请按1，90天请按2，半年请按3，全部请按4："))
+    # keyword = input("请输入查询关键字：")
+    # sel = int(input("查询7天请按0，30天请按1，90天请按2，半年请按3，全部请按4："))
+    keyword = "可乐"
+    sel = 7
     day = 0
     if sel == 0:
         day = 7
@@ -273,4 +342,5 @@ if __name__ == "__main__":
         day = 180
     elif sel == 4:
         day = "all"
+    openbrowser()
     getindex(keyword, day)
