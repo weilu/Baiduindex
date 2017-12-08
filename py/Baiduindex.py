@@ -112,12 +112,12 @@ def openbrowser():
             print("请输入“y”或者“n”！")
             select = input("请观察浏览器网站是否已经登陆(y/n)：")
 
-def parse_daily_score(keyword, day):
+def parse_daily_score(keyword, day, city, data_read={}):
     # 构造天数
     sel = '//a[@rel="' + str(day) + '"]'
     wait = WebDriverWait(browser, 10)
     element = wait.until(EC.element_to_be_clickable((By.XPATH, sel)))
-    time.sleep(1.1)
+    time.sleep(1.36)
     browser.find_element_by_xpath(sel).click()
     # 太快了
     time.sleep(2)
@@ -171,11 +171,13 @@ def parse_daily_score(keyword, day):
             date = browser.find_element_by_xpath('//div[@id="viewbox"]/div[1]/div[1]').text
             if date and len(date.strip().split(' ')) > 1:
                 date = date.strip().split(' ')[0]
+                if date in data_read: # skip parsing parsing if we already have the data point
+                    continue
             else:
                 print(f'WARN: unrecognized date: {date}')
                 consecutive_data_missing += 1
-                # quit trying when there are 5 consecutive blank indexes
-                if consecutive_data_missing >= 5:
+                # quit trying when there are 10 consecutive blank indexes
+                if consecutive_data_missing >= 10:
                     break
                 else:
                     continue
@@ -197,7 +199,7 @@ def parse_daily_score(keyword, day):
             int(locations['x'] + sizes['width'] / 4 + add_length), int(top + sizes['height'] / 2),
             int(locations['x'] + sizes['width'] * 2 / 3), int(top + sizes['height']))
             # 截取当前浏览器
-            path = "../baidu/" + str(num)
+            path = "../baidu/" + city + str(num)
             browser.save_screenshot(str(path) + ".png")
             # 打开截图切割
             img = Image.open(str(path) + ".png")
@@ -216,7 +218,9 @@ def parse_daily_score(keyword, day):
             # 图像识别
             try:
                 image = Image.open(str(path) + "zoom.jpg")
-                code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789,") or ''
+                code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789,")
+                if not code: # try recognizing it as a single digit number
+                    code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789, -psm 10")
                 code = code.replace(',', '')
             except:
                 code = ''
@@ -260,27 +264,41 @@ def visit_baidu_trends(keyword):
     time.sleep(1)
 
 
+def get_data_read():
+    existing_data = {}
+    with open("../baidu/index.csv", "r") as output:
+        rows = output.read().splitlines()[1:]
+        for row in rows:
+            data = row.split(',')
+            if data[2]:
+                if data[0] not in existing_data:
+                    existing_data[data[0]] = {data[1]: data[2]}
+                else:
+                    existing_data[data[0]][data[1]] = data[2]
+    return existing_data
+
 
 def getindex(keyword, day):
+    # read existing indexes to a map of map to avoid pulling data we've already grabbed
+    data_read = get_data_read()
+
     visit_baidu_trends(keyword)
 
-    file = open("../baidu/index.csv", "w")
-    file.write('city,date,score\n')
-
-    cities = ['梧州', '西安', '上海']
-    for city in cities:
-        find_city(city)
-        index = parse_daily_score(keyword, day)
-        for date, score in index.items():
-            file.write(f'{city},{date},{score}\n')
-        restore_city_selector()
-        time.sleep(1.12)
-
-    file.close()
+    with open("../baidu/index.csv", "a") as output:
+        # output.write('city,date,score\n')
+        with open("../baidu/prefectures.txt", "r") as input_cities:
+            cities = input_cities.read().splitlines()
+            for city in cities:
+                if find_city(city):
+                    index = parse_daily_score(keyword, day, city, data_read.get(city, {}))
+                    for date, score in index.items():
+                        output.write(f'{city},{date},{score}\n')
+                restore_city_selector()
+                time.sleep(1.12)
 
 
 def find_city_link(parent_element, text):
-    city_xpath = f".//dd/a[contains(text(), '{text}')]"
+    city_xpath = f".//dd/a[text() = '{text}']"
     try:
         city_link = parent_element.find_element_by_xpath(city_xpath)
         return city_link
@@ -305,8 +323,9 @@ def find_city(city, province=None):
         time.sleep(0.4)
         city_selector = browser.find_element_by_xpath('//*[@id="auto_gsid_17"]')
         city_link = find_city_link(city_selector, city)
-        print('city: ', city_link.text)
+        print('found city: ', city_link.text)
         city_link.click()
+        return True
     else: # if not found, try every province
         provinces = province_selector.find_elements_by_xpath('.//dd/a')
         for province in provinces:
@@ -318,10 +337,12 @@ def find_city(city, province=None):
             if city_link:
                 print('found city', city_link.text)
                 city_link.click()
-                break
+                return True
             else:
                 # bring back the province menu
                 browser.find_element_by_css_selector('#compOtharea > div > div.comBorderL').click()
+        print(f'WARN: Failed to find stats for {city}')
+        return False
 
 
 if __name__ == "__main__":
