@@ -1,0 +1,7 @@
+chromedriver==2.24.1
+olefile==0.44
+Pillow==4.3.0
+pyocr==0.4.7
+pytesseract==0.1.7
+selenium==3.8.0
+six==1.11.0
