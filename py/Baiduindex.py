@@ -44,7 +44,7 @@ def openbrowser():
     # 输入账号密码
     account = []
     try:
-        fileaccount = open("../baidu/account.txt", encoding='UTF-8')
+        fileaccount = open("../config/account.txt", encoding='UTF-8')
         accounts = fileaccount.readlines()
         for acc in accounts:
             account.append(acc.strip())
@@ -87,7 +87,7 @@ def openbrowser():
                 # 输入账号密码
                 account = []
                 try:
-                    fileaccount = open("../baidu/account.txt", encoding='UTF-8')
+                    fileaccount = open("../config/account.txt", encoding='UTF-8')
                     accounts = fileaccount.readlines()
                     for acc in accounts:
                         account.append(acc.strip())
@@ -283,7 +283,7 @@ def getindex(keyword, day):
 
     with open("../baidu/index.csv", "a") as output:
         # output.write('city,date,score\n')
-        with open("../baidu/prefectures.txt", "r") as input_cities:
+        with open("../config/prefectures.txt", "r") as input_cities:
             cities = input_cities.read().splitlines()
             for city in cities:
                 try:
