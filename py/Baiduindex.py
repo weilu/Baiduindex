@@ -286,12 +286,17 @@ def getindex(keyword, day):
         with open("../baidu/prefectures.txt", "r") as input_cities:
             cities = input_cities.read().splitlines()
             for city in cities:
-                if find_city(city):
-                    index = parse_daily_score(keyword, day, city, data_read.get(city, {}))
-                    for date, score in index.items():
-                        output.write(f'{city},{date},{score}\n')
-                restore_city_selector()
-                time.sleep(1.12)
+                try:
+                    if find_city(city):
+                        index = parse_daily_score(keyword, day, city, data_read.get(city, {}))
+                        for date, score in index.items():
+                            output.write(f'{city},{date},{score}\n')
+                    restore_city_selector()
+                    time.sleep(1.12)
+                except Exception as err:
+                    print(f'Error while parsing scores for city {city}')
+                    print(err)
+                    visit_baidu_trends(keyword)
 
 
 def find_city_link(parent_element, text):
