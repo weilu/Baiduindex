@@ -199,7 +199,7 @@ def parse_daily_score(keyword, day, city, data_read={}):
             int(locations['x'] + sizes['width'] / 4 + add_length), int(top + sizes['height'] / 2),
             int(locations['x'] + sizes['width'] * 2 / 3), int(top + sizes['height']))
             # 截取当前浏览器
-            path = "../baidu/" + city + str(num)
+            path = "../raw/" + city + str(num)
             browser.save_screenshot(str(path) + ".png")
             # 打开截图切割
             img = Image.open(str(path) + ".png")
