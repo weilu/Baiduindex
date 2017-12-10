@@ -216,14 +216,11 @@ def parse_daily_score(keyword, day, city, data_read={}):
             out.save(path + 'zoom.jpg', 'png', quality=95)
 
             # 图像识别
-            try:
-                image = Image.open(str(path) + "zoom.jpg")
-                code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789,")
-                if not code: # try recognizing it as a single digit number
-                    code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789, -psm 10")
-                code = code.replace(',', '')
-            except:
-                code = ''
+            image = Image.open(str(path) + "zoom.jpg")
+            code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789,")
+            if not code: # try recognizing it as a single digit number
+                code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789, -psm 10")
+            code = code.replace(',', '')
             index[date] = code
             num = num + 1
 
