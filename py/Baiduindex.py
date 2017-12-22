@@ -12,6 +12,7 @@ import time
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
@@ -30,7 +31,9 @@ def openbrowser():
     # 打开谷歌浏览器
     # Firefox()
     # Chrome()
-    browser = webdriver.Chrome()
+    desired = DesiredCapabilities.CHROME
+    desired ['loggingPrefs'] = { 'browser':'ALL' }
+    browser = webdriver.Chrome(desired_capabilities=desired)
     # 输入网址
     browser.get(url)
     # 打开浏览器时间
@@ -113,6 +116,7 @@ def openbrowser():
         else:
             print("请输入“y”或者“n”！")
             select = input("请观察浏览器网站是否已经登陆(y/n)：")
+    return browser
 
 
 def get_last_x_offset_index(city):
@@ -132,8 +136,7 @@ OFFSET_BY_DAY = {
         180: 6.78,
         1000000: ALL_OFFSET }
 
-
-def parse_daily_score(keyword, day, city, data_read={}):
+def set_date_range(day):
     # 构造天数
     sel = '//a[@rel="' + str(day) + '"]'
     wait = WebDriverWait(browser, 10)
@@ -142,6 +145,10 @@ def parse_daily_score(keyword, day, city, data_read={}):
     browser.find_element_by_xpath(sel).click()
     # 太快了
     time.sleep(2)
+
+
+def parse_daily_score(keyword, day, city, data_read={}):
+    set_date_range(day)
     # 滑动思路：http://blog.sina.com.cn/s/blog_620987bf0102v2r8.html
     # 滑动思路：http://blog.csdn.net/zhouxuan623/article/details/39338511
     # 向上移动鼠标80个像素，水平方向不同
@@ -237,11 +244,7 @@ def parse_daily_score(keyword, day, city, data_read={}):
 
             # 图像识别
             image = Image.open(str(path) + "zoom.jpg")
-            code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789,")
-            if not code: # try recognizing it as a single digit number
-                code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789, -psm 10")
-            code = code.replace(',', '')
-            index[date] = code
+            index[date] = extract_score(image)
 
     except Exception as err:
         print(err)
@@ -249,6 +252,13 @@ def parse_daily_score(keyword, day, city, data_read={}):
 
     print(index)
     return index
+
+
+def extract_score(image):
+    code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789,")
+    if not code: # try recognizing it as a single digit number
+        code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789, -psm 10")
+    return code.replace(',', '')
 
 
 def visit_baidu_trends(keyword):

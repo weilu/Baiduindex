@@ -5,3 +5,4 @@ pyocr==0.4.7
 pytesseract==0.1.7
 selenium==3.8.0
 six==1.11.0
+python-dateutil==2.6.1
