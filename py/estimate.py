@@ -3,16 +3,23 @@ from datetime import date, datetime
 from dateutil import rrule
 from PIL import Image
 from Baiduindex import (openbrowser, visit_baidu_trends, set_date_range,
-                        restore_city_selector, find_city, extract_score)
+                        restore_city_selector, find_city, extract_score,
+                        get_data_read)
 
 def getindex(keyword, browser):
     visit_baidu_trends(keyword)
+    outfile = "../baidu/trends.csv"
+    data_read = get_data_read(outfile)
 
-    with open("../baidu/trends.csv", "w") as output:
-        output.write('city,date,score\n')
+    with open(outfile, "a+") as output:
+        if not data_read:
+            output.write('city,date,score\n')
         with open("../config/prefectures.txt", "r") as input_cities:
             cities = input_cities.read().splitlines()
             for city in cities:
+                if city in data_read:
+                    print(f'{city} already processed, skipping')
+                    continue
                 try:
                     if find_city(city):
                         set_date_range('all')

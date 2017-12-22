@@ -290,9 +290,9 @@ def visit_baidu_trends(keyword):
     time.sleep(1)
 
 
-def get_data_read():
+def get_data_read(csv_file):
     existing_data = {}
-    with open("../baidu/index.csv", "r") as output:
+    with open(csv_file, "r") as output:
         rows = output.read().splitlines()[1:]
         for row in rows:
             data = row.split(',')
@@ -306,7 +306,7 @@ def get_data_read():
 
 def getindex(keyword, day):
     # read existing indexes to a map of map to avoid pulling data we've already grabbed
-    data_read = get_data_read()
+    data_read = get_data_read("../baidu/index.csv")
 
     visit_baidu_trends(keyword)
 
