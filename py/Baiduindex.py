@@ -17,6 +17,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 from PIL import Image
 import pytesseract
+from glob import glob
+import re
 
 
 # 打开浏览器
@@ -112,6 +114,25 @@ def openbrowser():
             print("请输入“y”或者“n”！")
             select = input("请观察浏览器网站是否已经登陆(y/n)：")
 
+
+def get_last_x_offset_index(city):
+    globs = glob(f'../raw/{city}*.png')
+    if globs:
+        match_fn = re.compile(f'..\/raw\/{city}(.*).png').match
+        return sorted([int(i.group(1)) for i in map(match_fn, globs)])[-1]
+    return 0
+
+
+NUM_DATA_POINTS = ((365* 4 + 366 * 2 + (365 - 20)) / 7)
+ALL_OFFSET = 1214 / NUM_DATA_POINTS
+OFFSET_BY_DAY = {
+        7: 202.33,
+        30: 41.68,
+        90: 13.64,
+        180: 6.78,
+        1000000: ALL_OFFSET }
+
+
 def parse_daily_score(keyword, day, city, data_read={}):
     # 构造天数
     sel = '//a[@rel="' + str(day) + '"]'
@@ -129,7 +150,6 @@ def parse_daily_score(keyword, day, city, data_read={}):
     # <rect x="20" y="130" width="914" height="207.66666666666666" r="0" rx="0" ry="0" fill="#ff0000" stroke="none" opacity="0" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); opacity: 0;"></rect>
     # xoyelement = browser.find_element_by_xpath('//rect[@stroke="none"]')
     xoyelement = browser.find_elements_by_css_selector("#trend rect")[2]
-    num = 0
     # 获得坐标长宽
     # x = xoyelement.location['x']
     # y = xoyelement.location['y']
@@ -144,27 +164,27 @@ def parse_daily_score(keyword, day, city, data_read={}):
     if day == "all":
         day = 1000000
 
+    # start from the last read date
+    last_x_index = get_last_x_offset_index(city)
+    if last_x_index >= NUM_DATA_POINTS:
+        print(f'{city} index fully parsed. Skipping')
+        return
+    if last_x_index:
+        x_0 += (last_x_index - 1) * OFFSET_BY_DAY[day]
+        print(f'restarting {city} from offset {x_0} index {last_x_index}')
+
     # 储存日期和数字的数组
     index = {}
     consecutive_data_missing = 0
     try:
         # webdriver.ActionChains(driver).move_to_element().click().perform()
         # 只有移动位置xoyelement[2]是准确的
-        for i in range(day):
+        for i in range(last_x_index, day):
             # 坐标偏移量???
             ActionChains(browser).move_to_element_with_offset(xoyelement, x_0, y_0).perform()
 
             # 构造规则
-            if day == 7:
-                x_0 = x_0 + 202.33
-            elif day == 30:
-                x_0 = x_0 + 41.68
-            elif day == 90:
-                x_0 = x_0 + 13.64
-            elif day == 180:
-                x_0 = x_0 + 6.78
-            elif day == 1000000:
-                x_0 = x_0 + 3.37222222
+            x_0 += OFFSET_BY_DAY[day]
             time.sleep(2)
             # <div class="imgtxt" style="margin-left:-117px;"></div>
             imgelement = browser.find_element_by_xpath('//div[@id="viewbox"]')
@@ -199,7 +219,7 @@ def parse_daily_score(keyword, day, city, data_read={}):
             int(locations['x'] + sizes['width'] / 4 + add_length), int(top + sizes['height'] / 2),
             int(locations['x'] + sizes['width'] * 2 / 3), int(top + sizes['height']))
             # 截取当前浏览器
-            path = "../raw/" + city + str(num)
+            path = "../raw/" + city + str(i)
             browser.save_screenshot(str(path) + ".png")
             # 打开截图切割
             img = Image.open(str(path) + ".png")
@@ -222,11 +242,10 @@ def parse_daily_score(keyword, day, city, data_read={}):
                 code = pytesseract.image_to_string(image, config="-c tessedit_char_whitelist=0123456789, -psm 10")
             code = code.replace(',', '')
             index[date] = code
-            num = num + 1
 
     except Exception as err:
         print(err)
-        print(num)
+        print(f'exception at {i}th data point')
 
     print(index)
     return index
